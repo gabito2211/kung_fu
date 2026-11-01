@@ -1,27 +1,43 @@
 #pragma once
 #include <SFML/Graphics.hpp>
+#include "Box.hpp"
 
 class Player {
 public:
     Player();
     void handleInput();
-    void update();
+    void update(const Box& obstacle);
     void draw(sf::RenderWindow& window);
 
-    // Getters necesarios para el orden de dibujado (Y-sorting)
     float getDepthY() const { return position.y; }
+    sf::FloatRect getBounds() const;
+    
+    // Método para saber si ya cayó completamente al vacío
+    bool hasFallen() const { return fallenToVoid; }
 
 private:
-    sf::Vector2f position; // Posición en el suelo (X, Y)
-    sf::Vector2f velocity; // Velocidad en X y Y
-    float z;               // Altura actual del salto (eje Z)
-    float vz;              // Velocidad vertical del salto
+    sf::Vector2f position;
+    sf::Vector2f velocity;
+    float z;
+    float vz;
 
-    // Nuevas variables de física de movimiento
     sf::Vector2f acceleration;
-    float maxSpeed;        // Velocidad máxima permitida
-    float accRate;         // Tasa de aceleración al arrancar
-    float friction;        // Factor de desaceleración (resbalamiento)
+    float walkMaxSpeed;
+    float runMaxSpeed;
+    float maxSpeed;
+    float accRate;
+    float friction;
 
-    sf::RectangleShape shape; // Placeholder visual provisional
+    sf::Clock doubleTapClock;
+    int lastDirection;
+    bool wasKeyReleased;
+    bool isRunning;
+    bool prevLeftPressed;
+    bool prevRightPressed;
+
+    // Control de caída al vacío
+    bool isFallingIntoVoid;
+    bool fallenToVoid;
+
+    sf::RectangleShape shape;
 };

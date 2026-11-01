@@ -9,55 +9,121 @@ Player::Player() {
     z = 0.f;
     vz = 0.f;
 
-    // Configuración de las físicas de movimiento
-    maxSpeed = 4.5f;
-    accRate = 0.4f;   // Qué tan rápido acelera
-    friction = 0.82f; // Factor de fricción (entre 0 y 1; más cercano a 1 = más resbalue/inercia)
+    walkMaxSpeed = 4.0f;
+    runMaxSpeed = 8.0f;
+    maxSpeed = walkMaxSpeed;
+    accRate = 0.4f;
+    friction = 0.82f;
 
-    // Configurar la figura temporal del jugador (ancho 40, alto 80)
+    lastDirection = 0;
+    wasKeyReleased = true;
+    isRunning = false;
+    prevLeftPressed = false;
+    prevRightPressed = false;
+
+    isFallingIntoVoid = false;
+    fallenToVoid = false;
+
     shape.setSize(sf::Vector2f(40.f, 80.f));
     shape.setFillColor(sf::Color::Cyan);
-    shape.setOrigin(20.f, 80.f); // Origin en los pies para que el eje Y apunte al suelo
+    shape.setOrigin(20.f, 80.f);
+}
+
+sf::FloatRect Player::getBounds() const {
+    return sf::FloatRect(position.x - 15.f, position.y - 10.f, 30.f, 20.f);
 }
 
 void Player::handleInput() {
-    // Reiniciar aceleración en cada frame antes de leer el teclado
+    // Si ya está cayendo al vacío, no permitimos controlar al personaje
+    if (isFallingIntoVoid) return;
+
     acceleration = sf::Vector2f(0.f, 0.f);
 
-    // Movimiento horizontal (X)
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-        acceleration.x = -accRate;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-        acceleration.x = accRate;
+    bool currentLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
+    bool currentRight = sf::Keyboard::isKeyPressed(sf::Keyboard::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
 
-    // Movimiento de profundidad (Y)
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+    if (currentLeft && !prevLeftPressed) {
+        if (lastDirection == -1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
+            isRunning = true;
+        } else {
+            lastDirection = -1;
+            isRunning = false;
+        }
+        doubleTapClock.restart();
+        wasKeyReleased = false;
+    }
+    if (!currentLeft && prevLeftPressed) {
+        wasKeyReleased = true;
+    }
+
+    if (currentRight && !prevRightPressed) {
+        if (lastDirection == 1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
+            isRunning = true;
+        } else {
+            lastDirection = 1;
+            isRunning = false;
+        }
+        doubleTapClock.restart();
+        wasKeyReleased = false;
+    }
+    if (!currentRight && prevRightPressed) {
+        wasKeyReleased = true;
+    }
+
+    prevLeftPressed = currentLeft;
+    prevRightPressed = currentRight;
+
+    maxSpeed = isRunning ? runMaxSpeed : walkMaxSpeed;
+
+    if (currentLeft) acceleration.x = -accRate;
+    if (currentRight) acceleration.x = accRate;
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
         acceleration.y = -accRate;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+        isRunning = false;
+    }
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
         acceleration.y = accRate;
+        isRunning = false;
+    }
 
-    // Salto (Espacio o tecla K) solo si está en el suelo (z == 0)
+    if (!currentLeft && !currentRight && std::abs(velocity.x) < 0.5f) {
+        isRunning = false;
+    }
+
     if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Keyboard::isKeyPressed(sf::Keyboard::K)) && z == 0.f) {
-        vz = 12.5f; // Impulso positivo hacia arriba
+        vz = 12.5f;
     }
 }
 
-void Player::update() {
-    // 1. Aplicar aceleración a la velocidad
+void Player::update(const Box& obstacle) {
+    // Si ya cayó al abismo, actualizamos su caída libre hacia abajo
+    if (isFallingIntoVoid) {
+        vz -= GRAVITY; // Acelera hacia abajo
+        z += vz;       // Z se vuelve negativo (cae por debajo del nivel del suelo)
+        
+        // Si cae lo suficiente, marcamos que terminó de caer
+        if (z < -100.f) {
+            fallenToVoid = true;
+        }
+        shape.setPosition(position.x, position.y - z);
+        return;
+    }
+
     velocity += acceleration;
 
-    // Aplicar fricción si NO se está presionando ninguna tecla de movimiento en ese eje
     if (acceleration.x == 0.f) {
         velocity.x *= friction;
-        // Detener por completo si la velocidad es muy cercana a cero para evitar micro-movimientos
-        if (std::abs(velocity.x) < 0.05f) velocity.x = 0.f;
+        if (std::abs(velocity.x) < 0.05f) {
+            velocity.x = 0.f;
+            isRunning = false;
+        }
     }
     if (acceleration.y == 0.f) {
         velocity.y *= friction;
         if (std::abs(velocity.y) < 0.05f) velocity.y = 0.f;
     }
 
-    // Limitar la velocidad máxima combinada (magnitud del vector de velocidad)
     float currentSpeedSq = (velocity.x * velocity.x) + (velocity.y * velocity.y);
     if (currentSpeedSq > (maxSpeed * maxSpeed)) {
         float currentSpeed = std::sqrt(currentSpeedSq);
@@ -65,32 +131,46 @@ void Player::update() {
         velocity.y = (velocity.y / currentSpeed) * maxSpeed;
     }
 
-    // 2. Actualizar posición en el suelo (X, Y)
-    position += velocity;
+    // Colisión Eje X
+    position.x += velocity.x;
+    if (obstacle.getBounds().intersects(getBounds())) {
+        position.x -= velocity.x;
+        velocity.x = 0.f;
+        isRunning = false;
+    }
 
-    // Restringir el movimiento Y dentro de los límites de profundidad del escenario
+    // Colisión Eje Y
+    position.y += velocity.y;
+    if (obstacle.getBounds().intersects(getBounds())) {
+        position.y -= velocity.y;
+        velocity.y = 0.f;
+    }
+
     if (position.y < FLOOR_Y_MIN) {
         position.y = FLOOR_Y_MIN;
-        velocity.y = 0.f; // Freno seco al chocar con los límites
+        velocity.y = 0.f;
     }
     if (position.y > FLOOR_Y_MAX) {
         position.y = FLOOR_Y_MAX;
         velocity.y = 0.f;
     }
 
-    // 3. Aplicar gravedad y física del salto (Eje Z)
+    // Física del salto (Eje Z)
     if (z > 0.f || vz != 0.f) {
-        vz -= GRAVITY; // La gravedad reduce la velocidad hacia arriba
-        z += vz;       // Actualiza la altura
-
-        // Aterrizaje en el suelo
+        vz -= GRAVITY;
+        z += vz;
         if (z <= 0.f) {
             z = 0.f;
             vz = 0.f;
         }
     }
 
-    // 4. Posición final en pantalla
+    // Comprobar si está en el suelo (z == 0) y pisa la zona de vacío
+    if (z == 0.f && isVoid(position.x, position.y)) {
+        isFallingIntoVoid = true;
+        vz = -1.0f; // Pequeño impulso inicial hacia abajo al caer
+    }
+
     shape.setPosition(position.x, position.y - z);
 }
 

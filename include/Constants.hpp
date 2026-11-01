@@ -1,8 +1,14 @@
 #pragma once
 
-// Constante de gravedad global para todos los elementos con física
 const float GRAVITY = 0.6f;
-
-// Límites del plano de profundidad (suelo)
 const float FLOOR_Y_MIN = 380.f;
 const float FLOOR_Y_MAX = 540.f;
+
+// Función para determinar si hay un abismo/vacío en una posición (X, Y)
+inline bool isVoid(float x, float y) {
+    // Un foso ubicado horizontalmente entre X = 500 y X = 650
+    if (x >= 500.f && x <= 650.f) {
+        return true;
+    }
+    return false;
+}
