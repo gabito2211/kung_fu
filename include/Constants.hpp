@@ -12,3 +12,7 @@ inline bool isVoid(float x, float y) {
     }
     return false;
 }
+
+// Configuración del escalón/borde elevado
+const float LEDGE_Y = 460.f;          // Línea divisoria del escalón
+const float LEDGE_MIN_Z = 15.f;       // Altura mínima de salto (Z) requerida para subir

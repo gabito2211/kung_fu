@@ -1,18 +1,16 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include "Box.hpp"
+#include "Tilemap.hpp"
 
 class Player {
 public:
     Player();
     void handleInput();
-    void update(const Box& obstacle);
+    void update(const Tilemap& tilemap);
     void draw(sf::RenderWindow& window);
 
     float getDepthY() const { return position.y; }
     sf::FloatRect getBounds() const;
-    
-    // Método para saber si ya cayó completamente al vacío
     bool hasFallen() const { return fallenToVoid; }
 
 private:
@@ -35,7 +33,6 @@ private:
     bool prevLeftPressed;
     bool prevRightPressed;
 
-    // Control de caída al vacío
     bool isFallingIntoVoid;
     bool fallenToVoid;
 

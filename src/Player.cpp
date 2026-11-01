@@ -3,7 +3,7 @@
 #include <cmath>
 
 Player::Player() {
-    position = sf::Vector2f(150.f, 460.f);
+    position = sf::Vector2f(150.f, 480.f);
     velocity = sf::Vector2f(0.f, 0.f);
     acceleration = sf::Vector2f(0.f, 0.f);
     z = 0.f;
@@ -34,7 +34,6 @@ sf::FloatRect Player::getBounds() const {
 }
 
 void Player::handleInput() {
-    // Si ya está cayendo al vacío, no permitimos controlar al personaje
     if (isFallingIntoVoid) return;
 
     acceleration = sf::Vector2f(0.f, 0.f);
@@ -52,9 +51,7 @@ void Player::handleInput() {
         doubleTapClock.restart();
         wasKeyReleased = false;
     }
-    if (!currentLeft && prevLeftPressed) {
-        wasKeyReleased = true;
-    }
+    if (!currentLeft && prevLeftPressed) wasKeyReleased = true;
 
     if (currentRight && !prevRightPressed) {
         if (lastDirection == 1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
@@ -66,9 +63,7 @@ void Player::handleInput() {
         doubleTapClock.restart();
         wasKeyReleased = false;
     }
-    if (!currentRight && prevRightPressed) {
-        wasKeyReleased = true;
-    }
+    if (!currentRight && prevRightPressed) wasKeyReleased = true;
 
     prevLeftPressed = currentLeft;
     prevRightPressed = currentRight;
@@ -87,25 +82,18 @@ void Player::handleInput() {
         isRunning = false;
     }
 
-    if (!currentLeft && !currentRight && std::abs(velocity.x) < 0.5f) {
-        isRunning = false;
-    }
+    if (!currentLeft && !currentRight && std::abs(velocity.x) < 0.5f) isRunning = false;
 
     if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Keyboard::isKeyPressed(sf::Keyboard::K)) && z == 0.f) {
         vz = 12.5f;
     }
 }
 
-void Player::update(const Box& obstacle) {
-    // Si ya cayó al abismo, actualizamos su caída libre hacia abajo
+void Player::update(const Tilemap& tilemap) {
     if (isFallingIntoVoid) {
-        vz -= GRAVITY; // Acelera hacia abajo
-        z += vz;       // Z se vuelve negativo (cae por debajo del nivel del suelo)
-        
-        // Si cae lo suficiente, marcamos que terminó de caer
-        if (z < -100.f) {
-            fallenToVoid = true;
-        }
+        vz -= GRAVITY;
+        z += vz;
+        if (z < -100.f) fallenToVoid = true;
         shape.setPosition(position.x, position.y - z);
         return;
     }
@@ -114,10 +102,7 @@ void Player::update(const Box& obstacle) {
 
     if (acceleration.x == 0.f) {
         velocity.x *= friction;
-        if (std::abs(velocity.x) < 0.05f) {
-            velocity.x = 0.f;
-            isRunning = false;
-        }
+        if (std::abs(velocity.x) < 0.05f) { velocity.x = 0.f; isRunning = false; }
     }
     if (acceleration.y == 0.f) {
         velocity.y *= friction;
@@ -131,31 +116,41 @@ void Player::update(const Box& obstacle) {
         velocity.y = (velocity.y / currentSpeed) * maxSpeed;
     }
 
-    // Colisión Eje X
+    // Guardar posiciones anteriores antes de movernos
+    float oldX = position.x;
+    float oldY = position.y;
+
+    // 1. Mover y comprobar Eje X (Laterales horizontales)
     position.x += velocity.x;
-    if (obstacle.getBounds().intersects(getBounds())) {
-        position.x -= velocity.x;
+    TileType tileX = tilemap.getTileAtPixel(position.x, position.y);
+    TileType prevTileX = tilemap.getTileAtPixel(oldX, position.y);
+
+    if (tileX == TILE_BOX) {
+        position.x = oldX;
+        velocity.x = 0.f;
+        isRunning = false;
+    } else if (prevTileX == TILE_FLOOR && tileX == TILE_HIGH_FLOOR && z < 15.f) {
+        // Bloquear entrada lateral (X) si no hay suficiente salto
+        position.x = oldX;
         velocity.x = 0.f;
         isRunning = false;
     }
 
-    // Colisión Eje Y
+    // 2. Mover y comprobar Eje Y (Laterales verticales / profundidad)
     position.y += velocity.y;
-    if (obstacle.getBounds().intersects(getBounds())) {
-        position.y -= velocity.y;
+    TileType tileY = tilemap.getTileAtPixel(position.x, position.y);
+    TileType prevTileY = tilemap.getTileAtPixel(position.x, oldY);
+
+    if (tileY == TILE_BOX) {
+        position.y = oldY;
+        velocity.y = 0.f;
+    } else if (prevTileY == TILE_FLOOR && tileY == TILE_HIGH_FLOOR && z < 15.f) {
+        // Bloquear entrada vertical (Y) si no hay suficiente salto
+        position.y = oldY;
         velocity.y = 0.f;
     }
 
-    if (position.y < FLOOR_Y_MIN) {
-        position.y = FLOOR_Y_MIN;
-        velocity.y = 0.f;
-    }
-    if (position.y > FLOOR_Y_MAX) {
-        position.y = FLOOR_Y_MAX;
-        velocity.y = 0.f;
-    }
-
-    // Física del salto (Eje Z)
+    // Física de salto (Eje Z)
     if (z > 0.f || vz != 0.f) {
         vz -= GRAVITY;
         z += vz;
@@ -165,10 +160,10 @@ void Player::update(const Box& obstacle) {
         }
     }
 
-    // Comprobar si está en el suelo (z == 0) y pisa la zona de vacío
-    if (z == 0.f && isVoid(position.x, position.y)) {
+    // Comprobar caída al vacío (TILE_VOID) si está en el suelo (z == 0)
+    if (z == 0.f && tilemap.getTileAtPixel(position.x, position.y) == TILE_VOID) {
         isFallingIntoVoid = true;
-        vz = -1.0f; // Pequeño impulso inicial hacia abajo al caer
+        vz = -1.0f;
     }
 
     shape.setPosition(position.x, position.y - z);
