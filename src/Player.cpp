@@ -1,6 +1,7 @@
 #include "Player.hpp"
 #include "Constants.hpp"
 #include <cmath>
+#include <iostream>
 
 Player::Player() {
     position = sf::Vector2f(150.f, 480.f);
@@ -24,9 +25,22 @@ Player::Player() {
     isFallingIntoVoid = false;
     fallenToVoid = false;
 
-    shape.setSize(sf::Vector2f(40.f, 80.f));
-    shape.setFillColor(sf::Color::Cyan);
-    shape.setOrigin(20.f, 80.f);
+    currentFrame = 0;
+    frameTime = 0.12f; // Tiempo de duración de cada fotograma en segundos
+    facingDirection = 1; // Mirando por defecto a la derecha
+
+    if (!texture.loadFromFile("assets/sprites/ryan.png")) {
+        std::cerr << "Error al cargar la textura de Alex desde assets/sprites/alex.png\n";
+    }
+
+    sprite.setTexture(texture);
+    
+    // Fotograma inicial por defecto (Ancho de frame aprox. 18px, Alto 32px según el sheet de NES)
+    sprite.setTextureRect(sf::IntRect(0, 0, 18, 32)); 
+    
+    // Centrar el origen horizontalmente y ponerlo en los pies verticalmente
+    sprite.setOrigin(12.f, 32.f);
+    sprite.scale(2.5f, 2.5f);
 }
 
 sf::FloatRect Player::getBounds() const {
@@ -70,8 +84,14 @@ void Player::handleInput() {
 
     maxSpeed = isRunning ? runMaxSpeed : walkMaxSpeed;
 
-    if (currentLeft) acceleration.x = -accRate;
-    if (currentRight) acceleration.x = accRate;
+    if (currentLeft) {
+        acceleration.x = -accRate;
+        facingDirection = -1;
+    }
+    if (currentRight) {
+        acceleration.x = accRate;
+        facingDirection = 1;
+    }
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
         acceleration.y = -accRate;
@@ -94,7 +114,7 @@ void Player::update(const Tilemap& tilemap) {
         vz -= GRAVITY;
         z += vz;
         if (z < -100.f) fallenToVoid = true;
-        shape.setPosition(position.x, position.y - z);
+        sprite.setPosition(position.x, position.y - z);
         return;
     }
 
@@ -116,11 +136,9 @@ void Player::update(const Tilemap& tilemap) {
         velocity.y = (velocity.y / currentSpeed) * maxSpeed;
     }
 
-    // Guardar posiciones anteriores antes de movernos
     float oldX = position.x;
     float oldY = position.y;
 
-    // 1. Mover y comprobar Eje X (Laterales horizontales)
     position.x += velocity.x;
     TileType tileX = tilemap.getTileAtPixel(position.x, position.y);
     TileType prevTileX = tilemap.getTileAtPixel(oldX, position.y);
@@ -130,13 +148,11 @@ void Player::update(const Tilemap& tilemap) {
         velocity.x = 0.f;
         isRunning = false;
     } else if (prevTileX == TILE_FLOOR && tileX == TILE_HIGH_FLOOR && z < 15.f) {
-        // Bloquear entrada lateral (X) si no hay suficiente salto
         position.x = oldX;
         velocity.x = 0.f;
         isRunning = false;
     }
 
-    // 2. Mover y comprobar Eje Y (Laterales verticales / profundidad)
     position.y += velocity.y;
     TileType tileY = tilemap.getTileAtPixel(position.x, position.y);
     TileType prevTileY = tilemap.getTileAtPixel(position.x, oldY);
@@ -145,12 +161,10 @@ void Player::update(const Tilemap& tilemap) {
         position.y = oldY;
         velocity.y = 0.f;
     } else if (prevTileY == TILE_FLOOR && tileY == TILE_HIGH_FLOOR && z < 15.f) {
-        // Bloquear entrada vertical (Y) si no hay suficiente salto
         position.y = oldY;
         velocity.y = 0.f;
     }
 
-    // Física de salto (Eje Z)
     if (z > 0.f || vz != 0.f) {
         vz -= GRAVITY;
         z += vz;
@@ -160,15 +174,50 @@ void Player::update(const Tilemap& tilemap) {
         }
     }
 
-    // Comprobar caída al vacío (TILE_VOID) si está en el suelo (z == 0)
     if (z == 0.f && tilemap.getTileAtPixel(position.x, position.y) == TILE_VOID) {
         isFallingIntoVoid = true;
         vz = -1.0f;
     }
 
-    shape.setPosition(position.x, position.y - z);
+    // --- LÓGICA DE SELECCIÓN DE ANIMACIÓN ---
+    int frameWidth = 28;
+    int frameHeight = 36;
+    int startX = 0;
+    int rowY = 0;
+    int numFrames = 1;
+
+    if (z > 0.f) {
+        // Animación de Salto (Fila específica de salto en la hoja)
+        rowY = 0; // Ajusta según la posición Y de los sprites de salto en tu sheet
+        startX =112;
+        numFrames = 1;
+    } else if (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f) {
+        // Animación de Caminar / Correr (Fila de caminata)
+        rowY = 0; // Ajusta según la fila de caminata
+        startX = 0;
+        numFrames = 4; // Cantidad de fotogramas que tiene la secuencia de caminar
+    } else {
+        // Estado de Reposo (Idle)
+        rowY = 0;
+        startX = 0;
+        numFrames = 1;
+    }
+
+    // Avanzar de fotograma según el tiempo transcurrido
+    if (animationClock.getElapsedTime().asSeconds() > frameTime) {
+        currentFrame = (currentFrame + 1) % numFrames;
+        animationClock.restart();
+    }
+
+    // Asignar el rectángulo del fotograma actual en la textura
+    sprite.setTextureRect(sf::IntRect(startX + (currentFrame * frameWidth), rowY, frameWidth, frameHeight));
+    
+    // Aplicar la dirección en la escala horizontal para voltear el sprite si va a la izquierda
+    sprite.setScale(facingDirection * 2.5f, 2.5f);
+
+    sprite.setPosition(position.x, position.y - z);
 }
 
 void Player::draw(sf::RenderWindow& window) {
-    window.draw(shape);
+    window.draw(sprite);
 }

@@ -12,6 +12,7 @@ public:
     float getDepthY() const { return position.y; }
     sf::FloatRect getBounds() const;
     bool hasFallen() const { return fallenToVoid; }
+    sf::Vector2f getPosition() const { return position; }
 
 private:
     sf::Vector2f position;
@@ -36,5 +37,12 @@ private:
     bool isFallingIntoVoid;
     bool fallenToVoid;
 
-    sf::RectangleShape shape;
+    // Elementos gráficos y de animación
+    sf::Texture texture;
+    sf::Sprite sprite;
+    
+    sf::Clock animationClock;
+    int currentFrame;
+    float frameTime;
+    int facingDirection; // 1 para derecha, -1 para izquierda
 };
