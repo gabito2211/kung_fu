@@ -23,9 +23,14 @@ private:
     float accRate;
     float friction;
 
-    // Control de caídas y saltos
     bool isFallingIntoVoid;
     bool fallenToVoid;
 
-    sf::RectangleShape shape;
+    // Elementos gráficos y de animación para el enemigo
+    sf::Texture texture;
+    sf::Sprite sprite;
+    sf::Clock animationClock;
+    int currentFrame;
+    float frameTime;
+    int facingDirection;
 };

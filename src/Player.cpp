@@ -187,16 +187,24 @@ void Player::update(const Tilemap& tilemap) {
     int numFrames = 1;
 
     if (z > 0.f) {
-        // Animación de Salto (Fila específica de salto en la hoja)
-        rowY = 0; // Ajusta según la posición Y de los sprites de salto en tu sheet
-        startX =112;
+        // Animación de Salto
+        rowY = 0; 
+        startX = 112; // Coordenada X del sprite de salto en tu sheet
         numFrames = 1;
-    } else if (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f) {
-        // Animación de Caminar / Correr (Fila de caminata)
-        rowY = 0; // Ajusta según la fila de caminata
-        startX = 0;
-        numFrames = 4; // Cantidad de fotogramas que tiene la secuencia de caminar
-    } else {
+    } 
+    else if (isRunning && (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f)) {
+        // --- ANIMACIÓN DE CORRER ---
+        rowY = 0;      // Fila correspondiente a correr (o cámbiala si está en otra fila vertical)
+        startX = 140;  // Ajusta este valor X según dónde comiencen los sprites de correr en tu imagen
+        numFrames = 2; // Cantidad de fotogramas que tiene la secuencia de correr
+    } 
+    else if (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f) {
+        // --- ANIMACIÓN DE CAMINAR ---
+        rowY = 0; 
+        startX = 0;    // Inicio horizontal de los fotogramas de caminar
+        numFrames = 4; // Cantidad de fotogramas de caminar
+    } 
+    else {
         // Estado de Reposo (Idle)
         rowY = 0;
         startX = 0;
