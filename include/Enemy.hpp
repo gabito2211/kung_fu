@@ -11,6 +11,9 @@ public:
 
     sf::FloatRect getBounds() const;
     bool hasFallen() const { return fallenToVoid; }
+    
+    bool getIsAttacking() const { return isAttacking; }
+    sf::FloatRect getAttackBox() const;
 
 private:
     sf::Vector2f position;
@@ -19,6 +22,8 @@ private:
     float vz;
 
     sf::Vector2f acceleration;
+    float walkMaxSpeed;
+    float runMaxSpeed;
     float maxSpeed;
     float accRate;
     float friction;
@@ -26,7 +31,12 @@ private:
     bool isFallingIntoVoid;
     bool fallenToVoid;
 
-    // Elementos gráficos y de animación para el enemigo
+    // Control de IA para correr y atacar
+    bool isRunning;
+    bool isAttacking;
+    sf::Clock attackCooldownClock; // Tiempo entre ataques
+
+    // Elementos gráficos y de animación
     sf::Texture texture;
     sf::Sprite sprite;
     sf::Clock animationClock;

@@ -14,6 +14,10 @@ public:
     bool hasFallen() const { return fallenToVoid; }
     sf::Vector2f getPosition() const { return position; }
 
+    // Nuevos métodos de combate
+    bool getIsAttacking() const { return isAttacking; }
+    sf::FloatRect getAttackBox() const;
+
 private:
     sf::Vector2f position;
     sf::Vector2f velocity;
@@ -36,6 +40,11 @@ private:
 
     bool isFallingIntoVoid;
     bool fallenToVoid;
+
+    // Control de combate / ataque
+    bool isAttacking;
+    sf::Clock attackClock;
+    bool prevZPressed;
 
     // Elementos gráficos y de animación
     sf::Texture texture;

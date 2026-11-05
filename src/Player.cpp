@@ -47,6 +47,7 @@ sf::FloatRect Player::getBounds() const {
     return sf::FloatRect(position.x - 15.f, position.y - 10.f, 30.f, 20.f);
 }
 
+// --- Agregar dentro de handleInput() ---
 void Player::handleInput() {
     if (isFallingIntoVoid) return;
 
@@ -55,56 +56,71 @@ void Player::handleInput() {
     bool currentLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
     bool currentRight = sf::Keyboard::isKeyPressed(sf::Keyboard::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
 
-    if (currentLeft && !prevLeftPressed) {
-        if (lastDirection == -1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
-            isRunning = true;
-        } else {
-            lastDirection = -1;
+    // Detección de la tecla Z para golpear (solo si está en el suelo y no está atacando ya)
+    bool currentZ = sf::Keyboard::isKeyPressed(sf::Keyboard::Z);
+    if (currentZ && !prevZPressed && !isAttacking && z == 0.f) {
+        isAttacking = true;
+        attackClock.restart();
+        currentFrame = 0; // Reiniciar animación de golpe
+    }
+    prevZPressed = currentZ;
+
+    // Si está atacando, bloqueamos el movimiento horizontal mientras dura el golpe
+    if (isAttacking) {
+        acceleration.x = 0.f;
+    } else {
+        // Lógica normal de movimiento...
+        if (currentLeft && !prevLeftPressed) {
+            if (lastDirection == -1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
+                isRunning = true;
+            } else {
+                lastDirection = -1;
+                isRunning = false;
+            }
+            doubleTapClock.restart();
+            wasKeyReleased = false;
+        }
+        if (!currentLeft && prevLeftPressed) wasKeyReleased = true;
+
+        if (currentRight && !prevRightPressed) {
+            if (lastDirection == 1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
+                isRunning = true;
+            } else {
+                lastDirection = 1;
+                isRunning = false;
+            }
+            doubleTapClock.restart();
+            wasKeyReleased = false;
+        }
+        if (!currentRight && prevRightPressed) wasKeyReleased = true;
+
+        prevLeftPressed = currentLeft;
+        prevRightPressed = currentRight;
+
+        maxSpeed = isRunning ? runMaxSpeed : walkMaxSpeed;
+
+        if (currentLeft) {
+            acceleration.x = -accRate;
+            facingDirection = -1;
+        }
+        if (currentRight) {
+            acceleration.x = accRate;
+            facingDirection = 1;
+        }
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
+            acceleration.y = -accRate;
             isRunning = false;
         }
-        doubleTapClock.restart();
-        wasKeyReleased = false;
-    }
-    if (!currentLeft && prevLeftPressed) wasKeyReleased = true;
-
-    if (currentRight && !prevRightPressed) {
-        if (lastDirection == 1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
-            isRunning = true;
-        } else {
-            lastDirection = 1;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
+            acceleration.y = accRate;
             isRunning = false;
         }
-        doubleTapClock.restart();
-        wasKeyReleased = false;
-    }
-    if (!currentRight && prevRightPressed) wasKeyReleased = true;
-
-    prevLeftPressed = currentLeft;
-    prevRightPressed = currentRight;
-
-    maxSpeed = isRunning ? runMaxSpeed : walkMaxSpeed;
-
-    if (currentLeft) {
-        acceleration.x = -accRate;
-        facingDirection = -1;
-    }
-    if (currentRight) {
-        acceleration.x = accRate;
-        facingDirection = 1;
-    }
-
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
-        acceleration.y = -accRate;
-        isRunning = false;
-    }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
-        acceleration.y = accRate;
-        isRunning = false;
     }
 
     if (!currentLeft && !currentRight && std::abs(velocity.x) < 0.5f) isRunning = false;
 
-    if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Keyboard::isKeyPressed(sf::Keyboard::K)) && z == 0.f) {
+    if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Keyboard::isKeyPressed(sf::Keyboard::K)) && z == 0.f && !isAttacking) {
         vz = 12.5f;
     }
 }
@@ -179,6 +195,13 @@ void Player::update(const Tilemap& tilemap) {
         vz = -1.0f;
     }
 
+    // Control de duración del ataque (ej. 350 milisegundos)
+    if (isAttacking) {
+        if (attackClock.getElapsedTime().asMilliseconds() > 350) {
+            isAttacking = false;
+        }
+    }
+
     // --- LÓGICA DE SELECCIÓN DE ANIMACIÓN ---
     int frameWidth = 28;
     int frameHeight = 36;
@@ -186,26 +209,28 @@ void Player::update(const Tilemap& tilemap) {
     int rowY = 0;
     int numFrames = 1;
 
-    if (z > 0.f) {
-        // Animación de Salto
+    if (isAttacking) {
+        // Animación de Golpe (Ajusta rowY y startX según tu hoja de sprites)
+        rowY = 36;     // Fila vertical donde se encuentran los golpes en el spritesheet
+        startX = 0;    // Coordenada X inicial de los fotogramas de golpe
+        numFrames = 3; // Cantidad de fotogramas que dura el golpe
+    }
+    else if (z > 0.f) {
         rowY = 0; 
-        startX = 112; // Coordenada X del sprite de salto en tu sheet
+        startX = 112; 
         numFrames = 1;
     } 
     else if (isRunning && (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f)) {
-        // --- ANIMACIÓN DE CORRER ---
-        rowY = 0;      // Fila correspondiente a correr (o cámbiala si está en otra fila vertical)
-        startX = 140;  // Ajusta este valor X según dónde comiencen los sprites de correr en tu imagen
-        numFrames = 2; // Cantidad de fotogramas que tiene la secuencia de correr
+        rowY = 0;      
+        startX = 140;  
+        numFrames = 2; 
     } 
     else if (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f) {
-        // --- ANIMACIÓN DE CAMINAR ---
         rowY = 0; 
-        startX = 0;    // Inicio horizontal de los fotogramas de caminar
-        numFrames = 4; // Cantidad de fotogramas de caminar
+        startX = 0;    
+        numFrames = 4; 
     } 
     else {
-        // Estado de Reposo (Idle)
         rowY = 0;
         startX = 0;
         numFrames = 1;
@@ -224,6 +249,15 @@ void Player::update(const Tilemap& tilemap) {
     sprite.setScale(facingDirection * 2.5f, 2.5f);
 
     sprite.setPosition(position.x, position.y - z);
+}
+
+sf::FloatRect Player::getAttackBox() const {
+    float attackWidth = 25.f;
+    float attackHeight = 20.f;
+    // Si mira a la derecha, la caja se genera adelante a la derecha; si mira a la izquierda, a la izquierda
+    float attackX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - attackWidth;
+    float attackY = position.y - 30.f;
+    return sf::FloatRect(attackX, attackY, attackWidth, attackHeight);
 }
 
 void Player::draw(sf::RenderWindow& window) {
