@@ -13,7 +13,9 @@ public:
     bool hasFallen() const { return fallenToVoid; }
     
     bool getIsAttacking() const { return isAttacking; }
+    bool getIsKicking() const { return isKicking; }
     sf::FloatRect getAttackBox() const;
+    sf::FloatRect getKickBox() const;
 
 private:
     sf::Vector2f position;
@@ -34,6 +36,7 @@ private:
     // Control de IA para correr y atacar
     bool isRunning;
     bool isAttacking;
+    bool isKicking;
     sf::Clock attackCooldownClock; // Tiempo entre ataques
 
     // Elementos gráficos y de animación

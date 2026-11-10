@@ -14,11 +14,19 @@ public:
     bool hasFallen() const { return fallenToVoid; }
     sf::Vector2f getPosition() const { return position; }
 
-    // Nuevos métodos de combate
     bool getIsAttacking() const { return isAttacking; }
+    bool getIsKicking() const { return isKicking; }
     sf::FloatRect getAttackBox() const;
+    sf::FloatRect getKickBox() const;
+
+    bool getIsHurt() const { return isHurt; }
+    void takeHit(float attackerX);
 
 private:
+
+    bool isHurt;
+    sf::Clock hurtClock;
+
     sf::Vector2f position;
     sf::Vector2f velocity;
     float z;
@@ -41,17 +49,18 @@ private:
     bool isFallingIntoVoid;
     bool fallenToVoid;
 
-    // Control de combate / ataque
+    // Control de combate (Puñetazo con Z y Patada con B)
     bool isAttacking;
+    bool isKicking;
     sf::Clock attackClock;
     bool prevZPressed;
+    bool prevXPressed;
 
-    // Elementos gráficos y de animación
     sf::Texture texture;
     sf::Sprite sprite;
     
     sf::Clock animationClock;
     int currentFrame;
     float frameTime;
-    int facingDirection; // 1 para derecha, -1 para izquierda
+    int facingDirection;
 };

@@ -2,6 +2,7 @@
 #include "Player.hpp"
 #include "Enemy.hpp"
 #include "Tilemap.hpp"
+#include <iostream>
 
 int main() {
     sf::RenderWindow window(sf::VideoMode(800, 600), "Kung Fu - Enemy Pursuit Test");
@@ -17,7 +18,7 @@ int main() {
             if (event.type == sf::Event::Closed)
                 window.close();
 
-                        // EDITAR EL TILEMAP CON EL RATÓN:
+            // EDITAR EL TILEMAP CON EL RATÓN:
             if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
                 int gridX = event.mouseButton.x / TILE_SIZE;
                 int gridY = event.mouseButton.y / TILE_SIZE;
@@ -30,6 +31,7 @@ int main() {
             }
         }
 
+        // 1. Actualizar entradas y físicas
         player.handleInput();
         player.update(tilemap);
         
@@ -40,19 +42,35 @@ int main() {
             window.close();
         }
 
+        // --- 2. SISTEMA DE COMBATE Y COLISIONES ---
+        // Validar si el Jugador ataca al Enemigo
+        if (player.getIsAttacking() || player.getIsKicking()) {
+            sf::FloatRect playerHitbox = player.getIsAttacking() ? player.getAttackBox() : player.getKickBox();
+            
+            if (playerHitbox.intersects(enemy.getBounds())) {
+                std::cout << "¡IMPACTO! El jugador golpeó al enemigo.\n";
+                // TODO: Aplicar daño o retroceso al enemigo
+            }
+        }
 
+        // Validar si el Enemigo ataca al Jugador
+        if (enemy.getIsAttacking() || enemy.getIsKicking()) {
+            sf::FloatRect enemyHitbox = enemy.getIsAttacking() ? enemy.getAttackBox() : enemy.getKickBox();
+            
+            if (enemyHitbox.intersects(player.getBounds())) {
+                std::cout << "¡Ouch! El enemigo golpeó al jugador.\n";
+                // TODO: Aplicar daño o retroceso al jugador
+            }
+        }   
 
+        // 3. Renderizado en pantalla
         window.clear(sf::Color(10, 10, 10));
 
         tilemap.draw(window);
-        enemy.draw(window); // O window.draw para el enemigo
+        enemy.draw(window);
         player.draw(window);
 
         window.display();
-
-
-            
-
     }
 
     return 0;

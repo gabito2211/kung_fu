@@ -56,20 +56,28 @@ void Player::handleInput() {
     bool currentLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
     bool currentRight = sf::Keyboard::isKeyPressed(sf::Keyboard::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
 
-    // Detección de la tecla Z para golpear (solo si está en el suelo y no está atacando ya)
+    // Detección de la tecla Z (Puñetazo)
     bool currentZ = sf::Keyboard::isKeyPressed(sf::Keyboard::Z);
-    if (currentZ && !prevZPressed && !isAttacking && z == 0.f) {
+    if (currentZ && !prevZPressed && !isAttacking && !isKicking && z == 0.f) {
         isAttacking = true;
         attackClock.restart();
-        currentFrame = 0; // Reiniciar animación de golpe
+        currentFrame = 0;
     }
     prevZPressed = currentZ;
 
-    // Si está atacando, bloqueamos el movimiento horizontal mientras dura el golpe
-    if (isAttacking) {
+    // Detección de la tecla X (Patada)
+    bool currentX = sf::Keyboard::isKeyPressed(sf::Keyboard::X);
+    if (currentX && !prevXPressed && !isAttacking && !isKicking && z == 0.f) {
+        isKicking = true;
+        attackClock.restart();
+        currentFrame = 0;
+    }
+    prevXPressed = currentX;
+
+    // Si está atacando o pateando, bloqueamos el movimiento
+    if (isAttacking || isKicking) {
         acceleration.x = 0.f;
     } else {
-        // Lógica normal de movimiento...
         if (currentLeft && !prevLeftPressed) {
             if (lastDirection == -1 && wasKeyReleased && doubleTapClock.getElapsedTime().asMilliseconds() < 300) {
                 isRunning = true;
@@ -120,7 +128,7 @@ void Player::handleInput() {
 
     if (!currentLeft && !currentRight && std::abs(velocity.x) < 0.5f) isRunning = false;
 
-    if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Keyboard::isKeyPressed(sf::Keyboard::K)) && z == 0.f && !isAttacking) {
+    if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Keyboard::isKeyPressed(sf::Keyboard::K)) && z == 0.f && !isAttacking && !isKicking) {
         vz = 12.5f;
     }
 }
@@ -195,10 +203,11 @@ void Player::update(const Tilemap& tilemap) {
         vz = -1.0f;
     }
 
-    // Control de duración del ataque (ej. 350 milisegundos)
-    if (isAttacking) {
+    // Control de duración de ataques (puñetazo o patada)
+    if (isAttacking || isKicking) {
         if (attackClock.getElapsedTime().asMilliseconds() > 350) {
             isAttacking = false;
+            isKicking = false;
         }
     }
 
@@ -209,7 +218,12 @@ void Player::update(const Tilemap& tilemap) {
     int rowY = 0;
     int numFrames = 1;
 
-    if (isAttacking) {
+    if (isKicking) {
+        rowY = 36;     // Fila vertical donde se encuentra la patada en el spritesheet
+        startX = 84;  // Coordenada X inicial de los fotogramas de patada
+        numFrames = 4; // Número de fotogramas de la patada
+    }
+    else if (isAttacking) {
         // Animación de Golpe (Ajusta rowY y startX según tu hoja de sprites)
         rowY = 36;     // Fila vertical donde se encuentran los golpes en el spritesheet
         startX = 0;    // Coordenada X inicial de los fotogramas de golpe
@@ -258,6 +272,14 @@ sf::FloatRect Player::getAttackBox() const {
     float attackX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - attackWidth;
     float attackY = position.y - 30.f;
     return sf::FloatRect(attackX, attackY, attackWidth, attackHeight);
+}
+
+sf::FloatRect Player::getKickBox() const {
+    float kickWidth = 30.f;
+    float kickHeight = 20.f;
+    float kickX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - kickWidth;
+    float kickY = position.y - 25.f;
+    return sf::FloatRect(kickX, kickY, kickWidth, kickHeight);
 }
 
 void Player::draw(sf::RenderWindow& window) {
