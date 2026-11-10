@@ -21,7 +21,13 @@ public:
     void takeHit(float attackerX);
     sf::Vector2f getPosition() const { return position; }
 
+    int getHealth() const { return health; }
+    bool isDead() const { return health <= 0; }
+    void takeHit(float attackerX, int damage);
+
 private:
+
+    int health;
 
     bool isHurt;
     sf::Clock hurtClock;

@@ -22,7 +22,13 @@ public:
     bool getIsHurt() const { return isHurt; }
     void takeHit(float attackerX);
 
+    int getHealth() const { return health; }
+    bool isDead() const { return health <= 0; }
+    void takeHit(float attackerX, int damage);
+
 private:
+
+    int health;
 
     bool isHurt;
     sf::Clock hurtClock;
