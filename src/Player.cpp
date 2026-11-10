@@ -49,7 +49,7 @@ sf::FloatRect Player::getBounds() const {
 
 // --- Agregar dentro de handleInput() ---
 void Player::handleInput() {
-    if (isFallingIntoVoid) return;
+    if (isHurt || isFallingIntoVoid) return;
 
     acceleration = sf::Vector2f(0.f, 0.f);
 
@@ -211,6 +211,13 @@ void Player::update(const Tilemap& tilemap) {
         }
     }
 
+    // Control de duración del estado de daño (Hitstun: 250 ms)
+    if (isHurt) {
+        if (hurtClock.getElapsedTime().asMilliseconds() > 250) {
+            isHurt = false;
+        }
+    }
+
     // --- LÓGICA DE SELECCIÓN DE ANIMACIÓN ---
     int frameWidth = 28;
     int frameHeight = 36;
@@ -218,7 +225,12 @@ void Player::update(const Tilemap& tilemap) {
     int rowY = 0;
     int numFrames = 1;
 
-    if (isKicking) {
+    if (isHurt) {
+        rowY = 216;      // Fila de daño / dolor
+        startX = 0;  // Coordenada X del fotograma de impacto en tu spritesheet
+        numFrames = 1; // Un solo fotograma estático de dolor
+    }
+    else if(isKicking) {
         rowY = 36;     // Fila vertical donde se encuentra la patada en el spritesheet
         startX = 84;  // Coordenada X inicial de los fotogramas de patada
         numFrames = 4; // Número de fotogramas de la patada
@@ -270,7 +282,7 @@ sf::FloatRect Player::getAttackBox() const {
     float attackHeight = 20.f;
     // Si mira a la derecha, la caja se genera adelante a la derecha; si mira a la izquierda, a la izquierda
     float attackX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - attackWidth;
-    float attackY = position.y - 30.f;
+    float attackY = position.y - 25.f;
     return sf::FloatRect(attackX, attackY, attackWidth, attackHeight);
 }
 
@@ -280,6 +292,18 @@ sf::FloatRect Player::getKickBox() const {
     float kickX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - kickWidth;
     float kickY = position.y - 25.f;
     return sf::FloatRect(kickX, kickY, kickWidth, kickHeight);
+}
+
+void Player::takeHit(float attackerX) {
+    if (isHurt) return; // Evita multi-impactos en el mismo frame
+    isHurt = true;
+    hurtClock.restart();
+    isAttacking = false;
+    isKicking = false;
+    
+    // Aplicar retroceso en X alejándose del atacante
+    velocity.x = (position.x < attackerX) ? -6.0f : 6.0f;
+    velocity.y = 0.f;
 }
 
 void Player::draw(sf::RenderWindow& window) {

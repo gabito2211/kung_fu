@@ -41,28 +41,25 @@ int main() {
         if (player.hasFallen()) {
             window.close();
         }
-
-        // --- 2. SISTEMA DE COMBATE Y COLISIONES ---
-        // Validar si el Jugador ataca al Enemigo
-        if (player.getIsAttacking() || player.getIsKicking()) {
+// 1. Validar si el Jugador ataca al Enemigo
+        if ((player.getIsAttacking() || player.getIsKicking()) && !enemy.getIsHurt()) {
             sf::FloatRect playerHitbox = player.getIsAttacking() ? player.getAttackBox() : player.getKickBox();
             
             if (playerHitbox.intersects(enemy.getBounds())) {
                 std::cout << "¡IMPACTO! El jugador golpeó al enemigo.\n";
-                // TODO: Aplicar daño o retroceso al enemigo
+                enemy.takeHit(player.getPosition().x);
             }
         }
 
-        // Validar si el Enemigo ataca al Jugador
-        if (enemy.getIsAttacking() || enemy.getIsKicking()) {
+        // 2. Validar si el Enemigo ataca al Jugador
+        if ((enemy.getIsAttacking() || enemy.getIsKicking()) && !player.getIsHurt()) {
             sf::FloatRect enemyHitbox = enemy.getIsAttacking() ? enemy.getAttackBox() : enemy.getKickBox();
             
             if (enemyHitbox.intersects(player.getBounds())) {
                 std::cout << "¡Ouch! El enemigo golpeó al jugador.\n";
-                // TODO: Aplicar daño o retroceso al jugador
+                player.takeHit(enemy.getPosition().x);
             }
-        }   
-
+        }
         // 3. Renderizado en pantalla
         window.clear(sf::Color(10, 10, 10));
 

@@ -17,7 +17,15 @@ public:
     sf::FloatRect getAttackBox() const;
     sf::FloatRect getKickBox() const;
 
+    bool getIsHurt() const { return isHurt; }
+    void takeHit(float attackerX);
+    sf::Vector2f getPosition() const { return position; }
+
 private:
+
+    bool isHurt;
+    sf::Clock hurtClock;
+
     sf::Vector2f position;
     sf::Vector2f velocity;
     float z;

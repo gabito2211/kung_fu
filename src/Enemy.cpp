@@ -185,6 +185,12 @@ void Enemy::update(const Tilemap& tilemap, const Player& player) {
         vz = -1.0f;
     }
 
+    if (isHurt) {
+        if (hurtClock.getElapsedTime().asMilliseconds() > 250) {
+            isHurt = false;
+        }
+    }
+
     // --- ANIMACIONES DEL ENEMIGO ---
     int frameWidth = 28;
     int frameHeight = 36;
@@ -192,7 +198,12 @@ void Enemy::update(const Tilemap& tilemap, const Player& player) {
     int rowY = 0;
     int numFrames = 1;
 
-    if (isKicking) {
+    if (isHurt) {
+        rowY = 216;
+        startX = 0; // Ajusta según tu sheet de enemigo
+        numFrames = 1;
+    }
+    else if(isKicking) {
         rowY = 36;     // Fila de patada
         startX = 84;   // Coordenada horizontal de la patada
         numFrames = 4;
@@ -226,6 +237,18 @@ void Enemy::update(const Tilemap& tilemap, const Player& player) {
     sprite.setTextureRect(sf::IntRect(startX + (currentFrame * frameWidth), rowY, frameWidth, frameHeight));
     sprite.setScale(facingDirection * 2.5f, 2.5f);
     sprite.setPosition(position.x, position.y - z);
+}
+
+void Enemy::takeHit(float attackerX) {
+    if (isHurt) return;
+    isHurt = true;
+    hurtClock.restart();
+    isAttacking = false;
+    isKicking = false;
+    
+    // Retroceso para el enemigo
+    velocity.x = (position.x < attackerX) ? -6.0f : 6.0f;
+    velocity.y = 0.f;
 }
 
 void Enemy::draw(sf::RenderWindow& window) {
