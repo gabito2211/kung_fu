@@ -2,7 +2,7 @@
 #include "Constants.hpp"
 #include <cmath>
 #include <iostream>
-#include <cstdlib> // Necesario para std::rand()
+#include <cstdlib>
 
 Enemy::Enemy(float startX, float startY) {
     position = sf::Vector2f(startX, startY);
@@ -10,6 +10,8 @@ Enemy::Enemy(float startX, float startY) {
     acceleration = sf::Vector2f(0.f, 0.f);
     z = 0.f;
     vz = 0.f;
+
+    health = 100;
 
     walkMaxSpeed = 3.0f;
     runMaxSpeed = 6.5f;
@@ -22,6 +24,8 @@ Enemy::Enemy(float startX, float startY) {
     isRunning = false;
     isAttacking = false;
     isKicking = false;
+    isUppercut = false;
+    isHighKick = false;
 
     currentFrame = 0;
     frameTime = 0.12f;
@@ -45,7 +49,7 @@ sf::FloatRect Enemy::getAttackBox() const {
     float attackWidth = 25.f;
     float attackHeight = 20.f;
     float attackX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - attackWidth;
-    float attackY = position.y - 30.f;
+    float attackY = position.y - 25.f;
     return sf::FloatRect(attackX, attackY, attackWidth, attackHeight);
 }
 
@@ -57,11 +61,37 @@ sf::FloatRect Enemy::getKickBox() const {
     return sf::FloatRect(kickX, kickY, kickWidth, kickHeight);
 }
 
+sf::FloatRect Enemy::getUppercutBox() const {
+    float width = 30.f; float height = 35.f;
+    float boxX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - width;
+    float boxY = position.y - 45.f;
+    return sf::FloatRect(boxX, boxY, width, height);
+}
+
+sf::FloatRect Enemy::getHighKickBox() const {
+    float width = 35.f; float height = 25.f;
+    float boxX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - width;
+    float boxY = position.y - 35.f;
+    return sf::FloatRect(boxX, boxY, width, height);
+}
+
 void Enemy::update(const Tilemap& tilemap, const Player& player) {
+    // Si está aturdido por un remate (10 segundos)
+    if (stunned) {
+        if (stunClock.getElapsedTime().asSeconds() >= 10.f) {
+            stunned = false;
+        }
+        sprite.setPosition(position.x, position.y - z);
+        return;
+    }
+
     if (isFallingIntoVoid) {
         vz -= GRAVITY;
         z += vz;
-        if (z < -100.f) fallenToVoid = true;
+        if (z < -100.f) {
+            fallenToVoid = true;
+            health = 0;
+        }
         sprite.setPosition(position.x, position.y - z);
         return;
     }
@@ -81,25 +111,40 @@ void Enemy::update(const Tilemap& tilemap, const Player& player) {
         maxSpeed = walkMaxSpeed;
     }
 
-    // --- IA: DECIDIR SI ATACA (ALEATORIO ENTRE PUÑETAZO Y PATADA) ---
-    if (distance < 45.f && z == 0.f && !isAttacking && !isKicking && attackCooldownClock.getElapsedTime().asSeconds() > 1.2f) {
+    // --- IA: DECIDIR ATAQUE Y COMBOS (3 GOLPES / PATADAS PARA REMATE) ---
+    if (distance < 45.f && z == 0.f && !isAttacking && !isKicking && !isUppercut && !isHighKick && attackCooldownClock.getElapsedTime().asSeconds() > 1.2f) {
         int choice = std::rand() % 2; // 0 = Puñetazo, 1 = Patada
         if (choice == 0) {
-            isAttacking = true;
+            consecutivePunches++;
+            consecutiveKicks = 0;
+            if (consecutivePunches >= 3) {
+                isUppercut = true;
+                consecutivePunches = 0;
+            } else {
+                isAttacking = true;
+            }
         } else {
-            isKicking = true;
+            consecutiveKicks++;
+            consecutivePunches = 0;
+            if (consecutiveKicks >= 3) {
+                isHighKick = true;
+                consecutiveKicks = 0;
+            } else {
+                isKicking = true;
+            }
         }
         attackCooldownClock.restart();
         currentFrame = 0;
     }
 
-    // Si está realizando un ataque, se detiene
-    if (isAttacking || isKicking) {
+    if (isAttacking || isKicking || isUppercut || isHighKick) {
         acceleration.x = 0.f;
         acceleration.y = 0.f;
         if (attackCooldownClock.getElapsedTime().asMilliseconds() > 350) {
             isAttacking = false;
             isKicking = false;
+            isUppercut = false;
+            isHighKick = false;
         }
     } else {
         if (distX < -5.f) {
@@ -199,34 +244,26 @@ void Enemy::update(const Tilemap& tilemap, const Player& player) {
     int numFrames = 1;
 
     if (isHurt) {
-        rowY = 216;
-        startX = 0; // Ajusta según tu sheet de enemigo
-        numFrames = 1;
+        rowY = 216; startX = 0; numFrames = 1;
     }
-    else if(isKicking) {
-        rowY = 36;     // Fila de patada
-        startX = 84;   // Coordenada horizontal de la patada
-        numFrames = 4;
+    else if (isUppercut) {
+        rowY = 72; startX = 111; numFrames = 2;
+    }
+    else if (isHighKick) {
+        rowY = 31; startX = 196; numFrames = 1;
+    }
+    else if (isKicking) {
+        rowY = 36; startX = 84; numFrames = 4;
     } else if (isAttacking) {
-        rowY = 36;     // Fila de puñetazo
-        startX = 0;
-        numFrames = 3;
+        rowY = 36; startX = 0; numFrames = 3;
     } else if (z > 0.f) {
-        rowY = 0;
-        startX = 112;
-        numFrames = 1;
+        rowY = 0; startX = 112; numFrames = 1;
     } else if (isRunning && (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f)) {
-        rowY = 0;
-        startX = 140;
-        numFrames = 2;
+        rowY = 0; startX = 140; numFrames = 2;
     } else if (std::abs(velocity.x) > 0.5f || std::abs(velocity.y) > 0.5f) {
-        rowY = 0;
-        startX = 0;
-        numFrames = 4;
+        rowY = 0; startX = 0; numFrames = 4;
     } else {
-        rowY = 0;
-        startX = 0;
-        numFrames = 1;
+        rowY = 0; startX = 0; numFrames = 1;
     }
 
     if (animationClock.getElapsedTime().asSeconds() > frameTime) {
@@ -239,16 +276,26 @@ void Enemy::update(const Tilemap& tilemap, const Player& player) {
     sprite.setPosition(position.x, position.y - z);
 }
 
-void Enemy::takeHit(float attackerX) {
-    if (isHurt) return;
+void Enemy::takeHit(float attackerX, int damage, bool isFinisher) {
+    if (health <= 0) return;
+    health -= damage;
+    if (health < 0) health = 0;
+    
     isHurt = true;
     hurtClock.restart();
     isAttacking = false;
     isKicking = false;
+    isUppercut = false;
+    isHighKick = false;
     
-    // Retroceso para el enemigo
-    velocity.x = (position.x < attackerX) ? -6.0f : 6.0f;
+    float knockbackForce = isFinisher ? 18.0f : 6.0f;
+    velocity.x = (position.x < attackerX) ? -knockbackForce : knockbackForce;
     velocity.y = 0.f;
+
+    if (isFinisher) {
+        stunned = true;
+        stunClock.restart();
+    }
 }
 
 void Enemy::draw(sf::RenderWindow& window) {

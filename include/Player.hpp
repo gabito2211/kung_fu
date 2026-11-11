@@ -26,6 +26,16 @@ public:
     bool isDead() const { return health <= 0; }
     void takeHit(float attackerX, int damage);
 
+    bool getIsUppercut() const { return isUppercut; }
+    bool getIsHighKick() const { return isHighKick; }
+    sf::FloatRect getUppercutBox() const;
+    sf::FloatRect getHighKickBox() const;
+
+    bool isStunned() const { return stunned; }
+    void applyStun();
+
+    void takeHit(float attackerX, int damage, bool isFinisher);
+
 private:
 
     int health;
@@ -61,6 +71,14 @@ private:
     sf::Clock attackClock;
     bool prevZPressed;
     bool prevXPressed;
+
+    int consecutivePunches = 0;
+    int consecutiveKicks = 0;
+    bool isUppercut = false;
+    bool isHighKick = false;
+    
+    bool stunned = false;
+    sf::Clock stunClock;
 
     sf::Texture texture;
     sf::Sprite sprite;

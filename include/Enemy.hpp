@@ -14,23 +14,30 @@ public:
     
     bool getIsAttacking() const { return isAttacking; }
     bool getIsKicking() const { return isKicking; }
+    bool getIsUppercut() const { return isUppercut; }
+    bool getIsHighKick() const { return isHighKick; }
+
     sf::FloatRect getAttackBox() const;
     sf::FloatRect getKickBox() const;
+    sf::FloatRect getUppercutBox() const;
+    sf::FloatRect getHighKickBox() const;
 
     bool getIsHurt() const { return isHurt; }
-    void takeHit(float attackerX);
+    bool isStunned() const { return stunned; }
     sf::Vector2f getPosition() const { return position; }
 
     int getHealth() const { return health; }
     bool isDead() const { return health <= 0; }
-    void takeHit(float attackerX, int damage);
+    void takeHit(float attackerX, int damage, bool isFinisher);
 
 private:
-
     int health;
 
     bool isHurt;
     sf::Clock hurtClock;
+
+    bool stunned = false;
+    sf::Clock stunClock;
 
     sf::Vector2f position;
     sf::Vector2f velocity;
@@ -47,13 +54,16 @@ private:
     bool isFallingIntoVoid;
     bool fallenToVoid;
 
-    // Control de IA para correr y atacar
+    // Control de IA para combos y ataques
     bool isRunning;
     bool isAttacking;
     bool isKicking;
-    sf::Clock attackCooldownClock; // Tiempo entre ataques
+    bool isUppercut;
+    bool isHighKick;
+    int consecutivePunches = 0;
+    int consecutiveKicks = 0;
+    sf::Clock attackCooldownClock;
 
-    // Elementos gráficos y de animación
     sf::Texture texture;
     sf::Sprite sprite;
     sf::Clock animationClock;

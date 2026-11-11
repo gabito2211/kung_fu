@@ -10,6 +10,8 @@ Player::Player() {
     z = 0.f;
     vz = 0.f;
 
+    health = 100;
+
     walkMaxSpeed = 4.0f;
     runMaxSpeed = 8.0f;
     maxSpeed = walkMaxSpeed;
@@ -49,6 +51,13 @@ sf::FloatRect Player::getBounds() const {
 
 // --- Agregar dentro de handleInput() ---
 void Player::handleInput() {
+    if (stunned) {
+        if (stunClock.getElapsedTime().asSeconds() >= 10.f) {
+            stunned = false; // Se libera del aturdimiento tras 10 segundos
+        }
+        return;
+    }
+
     if (isHurt || isFallingIntoVoid) return;
 
     acceleration = sf::Vector2f(0.f, 0.f);
@@ -58,8 +67,15 @@ void Player::handleInput() {
 
     // Detección de la tecla Z (Puñetazo)
     bool currentZ = sf::Keyboard::isKeyPressed(sf::Keyboard::Z);
-    if (currentZ && !prevZPressed && !isAttacking && !isKicking && z == 0.f) {
-        isAttacking = true;
+    if (currentZ && !prevZPressed && !isAttacking && !isKicking && !isUppercut && !isHighKick && z == 0.f) {
+        consecutivePunches++;
+        consecutiveKicks = 0; // Reinicia patadas si alterna
+        if (consecutivePunches >= 3) {
+            isUppercut = true; // ¡Remate Uppercut!
+            consecutivePunches = 0;
+        } else {
+            isAttacking = true;
+        }
         attackClock.restart();
         currentFrame = 0;
     }
@@ -67,8 +83,15 @@ void Player::handleInput() {
 
     // Detección de la tecla X (Patada)
     bool currentX = sf::Keyboard::isKeyPressed(sf::Keyboard::X);
-    if (currentX && !prevXPressed && !isAttacking && !isKicking && z == 0.f) {
-        isKicking = true;
+    if (currentX && !prevXPressed && !isAttacking && !isKicking && !isUppercut && !isHighKick && z == 0.f) {
+        consecutiveKicks++;
+        consecutivePunches = 0; // Reinicia golpes si alterna
+        if (consecutiveKicks >= 3) {
+            isHighKick = true; // ¡Remate HighKick!
+            consecutiveKicks = 0;
+        } else {
+            isKicking = true;
+        }
         attackClock.restart();
         currentFrame = 0;
     }
@@ -137,7 +160,10 @@ void Player::update(const Tilemap& tilemap) {
     if (isFallingIntoVoid) {
         vz -= GRAVITY;
         z += vz;
-        if (z < -100.f) fallenToVoid = true;
+        if (z < -100.f){ 
+            fallenToVoid = true;
+            health = 0; // Muerte instantánea por abismo
+        }
         sprite.setPosition(position.x, position.y - z);
         return;
     }
@@ -218,6 +244,15 @@ void Player::update(const Tilemap& tilemap) {
         }
     }
 
+    if (isAttacking || isKicking || isUppercut || isHighKick) {
+        if (attackClock.getElapsedTime().asMilliseconds() > 350) {
+            isAttacking = false;
+            isKicking = false;
+            isUppercut = false;
+            isHighKick = false;
+        }
+    }
+
     // --- LÓGICA DE SELECCIÓN DE ANIMACIÓN ---
     int frameWidth = 28;
     int frameHeight = 36;
@@ -225,12 +260,20 @@ void Player::update(const Tilemap& tilemap) {
     int rowY = 0;
     int numFrames = 1;
 
+    // --- SELECCIÓN DE ANIMACIÓN ---
     if (isHurt) {
-        rowY = 216;      // Fila de daño / dolor
-        startX = 0;  // Coordenada X del fotograma de impacto en tu spritesheet
-        numFrames = 1; // Un solo fotograma estático de dolor
+        rowY = 216; startX = 0; numFrames = 1;
     }
-    else if(isKicking) {
+    else if (isUppercut) {
+        rowY = 72;   // Fila correspondiente al Uppercut en tu spritesheet
+        startX = 111;  
+        numFrames = 2;
+    }
+    else if (isHighKick) {
+        rowY = 31;  // Fila correspondiente a la HighKick en tu spritesheet
+        startX = 196;
+        numFrames = 1;
+    }else if(isKicking) {
         rowY = 36;     // Fila vertical donde se encuentra la patada en el spritesheet
         startX = 84;  // Coordenada X inicial de los fotogramas de patada
         numFrames = 4; // Número de fotogramas de la patada
@@ -294,16 +337,51 @@ sf::FloatRect Player::getKickBox() const {
     return sf::FloatRect(kickX, kickY, kickWidth, kickHeight);
 }
 
-void Player::takeHit(float attackerX) {
-    if (isHurt) return; // Evita multi-impactos en el mismo frame
+void Player::takeHit(float attackerX, int damage) {
+    if (isHurt || health <= 0) return;
+    health -= damage;
+    if (health < 0) health = 0;
+    
     isHurt = true;
     hurtClock.restart();
     isAttacking = false;
     isKicking = false;
     
-    // Aplicar retroceso en X alejándose del atacante
     velocity.x = (position.x < attackerX) ? -6.0f : 6.0f;
     velocity.y = 0.f;
+}
+
+sf::FloatRect Player::getUppercutBox() const {
+    float width = 30.f; float height = 35.f;
+    float boxX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - width;
+    float boxY = position.y - 45.f;
+    return sf::FloatRect(boxX, boxY, width, height);
+}
+
+sf::FloatRect Player::getHighKickBox() const {
+    float width = 35.f; float height = 25.f;
+    float boxX = (facingDirection == 1) ? position.x + 5.f : position.x - 5.f - width;
+    float boxY = position.y - 35.f;
+    return sf::FloatRect(boxX, boxY, width, height);
+}
+
+void Player::takeHit(float attackerX, int damage, bool isFinisher) {
+    if (isHurt || health <= 0) return;
+    health -= damage;
+    if (health < 0) health = 0;
+    
+    isHurt = true;
+    hurtClock.restart();
+    isAttacking = false; isKicking = false; isUppercut = false; isHighKick = false;
+    
+    float knockback = isFinisher ? 18.0f : 6.0f; // Mayor retroceso si es remate
+    velocity.x = (position.x < attackerX) ? -knockback : knockback;
+    velocity.y = 0.f;
+
+    if (isFinisher) {
+        stunned = true;
+        stunClock.restart(); // Inicia los 10 segundos de inmovilidad
+    }
 }
 
 void Player::draw(sf::RenderWindow& window) {
